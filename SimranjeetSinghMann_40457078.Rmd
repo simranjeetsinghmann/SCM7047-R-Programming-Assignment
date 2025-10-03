@@ -1,0 +1,360 @@
+---
+title: "SCM7047 assignment 1 - R programming"
+author: "Simranjeet Singh Mann-40457078"
+date: "`r Sys.Date()`"
+output: 
+  bookdown::html_document2:
+     toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+library(tidyverse)
+library(rprojroot)
+```
+
+
+# Question 1 {-}
+
+*Functioning code 5 marks*
+
+Solutions for this question should not rely on `tidyverse` functions.
+
+Write a function-based program in R which performs the following tasks based on data it reads from the CSV file `Q4-CervicalCancer.csv`. The program should be called using a _single_ line of code in which the user can specify _three_ arguments: `var_x` and `var_y` each representing a different variable in the dataset and `output_type` indicating the type of file in which to save summary statistics.
+
+a) Produce a data.frame containing summary statistics for `var_x` and `var_y`:  mean, standard deviation, median, range, and number of missing values. 
+*6 marks*
+
+
+b) Create a scatter plot between `var_x` and `var_y`. The plot should have X and Y axis labels and a plot title based on the selected attributes (e.g. – Biopsy Vs Age). 
+*10 marks*
+
+
+c) Your program should give the user an option to save the summary results as either a .csv or a .txt file, named `Q4-summary-statistics`. The file should be saved to the `output` folder in the project.
+*5 marks*
+
+
+About the sample file – This is a cervical cancer dataset from Hospital Universitario de Caracas, Venezuela. To learn more about the dataset, refer to the UCI Repository.
+
+```{r question-1, warning=FALSE}
+#answering Q1
+
+# Define the cervicalcancer_summary function
+cervicalcancer_summary <- function(var_x, var_y, output_type) {
+  #loading library
+  library(rprojroot)
+  
+  # Reading the CSV file 
+  cervical_cancer <- read.csv(find_rstudio_root_file("data","Q4-CervicalCancer.csv"), stringsAsFactors = FALSE)
+  
+  # Converting character columns to numeric where applicable
+  for (col in names(cervical_cancer)) {
+    if (is.character(cervical_cancer[[col]])) {
+      cervical_cancer[[col]] <- as.numeric(cervical_cancer[[col]])
+    }
+  }
+  
+  #  Creating Function to calculate summary statistics 
+  calculate_summary <- function(variable) {
+    if (is.numeric(cervical_cancer[[variable]])) {
+      mean_val <- mean(cervical_cancer[[variable]], na.rm = TRUE)
+      sd_val <- sd(cervical_cancer[[variable]], na.rm = TRUE)
+      median_val <- median(cervical_cancer[[variable]], na.rm = TRUE)
+      range_val <- range(cervical_cancer[[variable]], na.rm = TRUE)
+      missing_val <- sum(is.na(cervical_cancer[[variable]]))
+      
+      return(data.frame(
+        Variable = variable,
+        Mean = mean_val,
+        SD = sd_val,
+        Median = median_val,
+        Range = paste(range_val, collapse = " - "),
+        Missing = missing_val
+      ))
+    } else {
+      return(data.frame(
+        Variable = variable,
+        Mean = NA,
+        SD = NA,
+        Median = NA,
+        Range = NA,
+        Missing = sum(is.na(cervical_cancer[[variable]]))
+      ))
+    }
+  }
+  
+  # Calculating the summary statistics for var_x and var_y
+  summary_x <- calculate_summary(var_x)
+  summary_y <- calculate_summary(var_y)
+  
+  # Combining the summaries into one data frame
+  summary_df <- rbind(summary_x, summary_y)
+  
+  # 1.b. Creating scatter plot between var_x and var_y using base R plot
+  plot(cervical_cancer[[var_x]], cervical_cancer[[var_y]], 
+       xlab = var_x, ylab = var_y, 
+       main = paste("Scatter Plot between", var_x, "and", var_y))
+  
+  # 1.c. Saving the summary statistics to the specified output type
+  # Checking the output type and saving the data as either csv or txt
+  output_filename <- paste("Cervicalcancer_summary_statistics.", output_type, sep = "")
+  if (output_type == "csv") {
+    write.csv(summary_df,find_rstudio_root_file("output", output_filename), row.names = FALSE)
+  } else if (output_type == "txt") {
+    write.table(summary_df,find_rstudio_root_file("output", output_filename), row.names = FALSE, sep = "\t")
+  } else {
+    stop("Unsupported output type. Please use 'csv' or 'txt'.")
+  }
+  
+  # Returning the summary dataframe for further use
+  return(summary_df)
+}
+
+
+#example
+cervicalcancer_summary("Age", "First.sexual.intercourse", "csv")
+
+
+```
+
+# Question 2 {-}
+
+*Functioning code 5 marks*
+
+Solutions using either base R or `tidyverse` functions will be accepted for this question.
+
+As a member of a Data Science team in a Bio-analytics company, you have been assigned the following tasks:
+
+a) Develop a function-based R program which reads a dataset specified by the user and performs the following operations. The program should be called using a _single_ line of code in which the user can specify an appropriate number of arguments.
+  
+  i. Provide the filename, the number of dimensions and the names of variables for a user-specified dataset 
+  *6 marks*
+  
+
+  ii. Replace any missing values with NA. 
+  *2 marks*
+  
+
+  iii. Outputs a box plot of the distribution for at least one user-specified continuous variable. 
+  *6 marks*
+  
+
+Two files are provided, `Q5-File1.csv` contains clinical data and `Q5-File2.csv` contains protein expression data. The program should work for both of these files (called separately for each).
+
+```{r question-2A}
+#answering Q2.a
+
+# Define the function
+process_dataset <- function(file, continuous_var) {
+  # Loading necessary libraries
+  library(tidyverse)
+  
+  # Reading the dataset
+  data <- read_csv(file)
+  
+  # i. Providing the filename, the number of dimensions, and the names of variables
+  cat("Filename:", file, "\n")
+  cat("Number of rows:", nrow(data), "\n")
+  cat("Number of columns:", ncol(data), "\n")
+  cat("Names of variables:\n", paste(names(data), collapse = ", "), "\n\n")
+  
+  # ii. Replacing missing values with NA
+  data <- data %>%
+    mutate(across(everything(), ~ ifelse(. %in% c("", "NA", "N/A"), NA, .)))
+  cat("Missing values replaced with NA.\n")
+  
+  #  Converting protein columns (starting with "Protein") to numeric
+  data <- data %>%
+    mutate(across(starts_with("Protein"), ~ as.numeric(as.character(.))))
+  cat("Protein columns converted to numeric where applicable.\n")
+  
+  # iii. Output a box plot for the specified continuous variable
+  if (continuous_var %in% names(data)) {
+    if (is.numeric(data[[continuous_var]])) {
+      
+      # Plotting the box plot with exceptions
+      
+      p <- ggplot(data, aes(x = "", y = .data[[continuous_var]])) +
+        geom_boxplot() +
+        labs(title = paste("Boxplot of", continuous_var), y = continuous_var, x = "") +
+        theme_minimal()
+      print(p) # Print the plot
+    } else {
+      cat("The specified variable is not numeric. Box plot cannot be created.\n")
+    }
+  } else {
+    cat("The specified variable is not in the dataset.\n")
+  }
+  
+  # Returning the processed dataset for further use
+  return(data)
+}
+
+#example
+process_dataset(find_rstudio_root_file("data/Q5-file2.csv"),"Protein 7")
+
+
+
+```
+
+b) Develop a function-based R program, which matches patient IDs (variable `PatientID`) from the first dataset with reference IDs (`Reference_ID`) from the second dataset. `Reference ID` in the second file is a combination of patient ID with sample ID (hint – try strsplit() or tidyverse separate()). For each patient, produce a data.frame listing the arithmetic mean of expression values for each protein. Thereafter, based on a user specified threshold value, produce a data.frame listing patients with a mean protein expression value for any protein above this threshold. The program should be called using a _single_ line of code in which the user can specify the protein threshold as an argument.
+
+*26 marks*
+
+
+```{r question-2B}
+
+# answering Q2.b
+#creating function for protien expression analysis
+analyze_protein_expression <- function(threshold = 10) {
+   # loading libraries
+  library(dplyr)
+  library(tidyr)
+  library(rprojroot)
+  
+  # file paths
+   
+  file1 <- read.csv(find_rstudio_root_file("data","Q5-File1.csv"))
+  file2 <- read.csv(find_rstudio_root_file("data","Q5-File2.csv"))
+  
+ 
+  
+  # Reading the datasets
+  dataset1 <- file1
+  dataset2 <- file2
+  
+  # Ensure PatientID is treated as character for consistent merging
+  dataset1 <- dataset1 %>%
+    mutate(PatientID = as.character(PatientID))
+  
+  # Splitting Reference_ID into PatientID and SampleID
+  dataset2 <- dataset2 %>%
+    separate(Reference_ID, into = c("PatientID", "SampleID"), sep = "_")
+  
+  # Converting all protein columns to numeric
+  dataset2 <- dataset2 %>%
+    mutate(across(starts_with("Protein"), as.numeric))
+  
+  # Calculating the mean expression values for each protein per patient
+  mean_expression <- dataset2 %>%
+    group_by(PatientID) %>%
+    summarise(across(starts_with("Protein"), mean, na.rm = TRUE))
+  
+  # Merging with the first dataset to include additional PatientID data
+  merged_data <- dataset1 %>%
+    inner_join(mean_expression, by = "PatientID")
+  
+  # Filtering patients whose mean expression exceeds the threshold for at least one protein
+  filtered_patients <- merged_data %>%
+    rowwise() %>%
+    filter(any(c_across(starts_with("Protein")) > threshold)) %>%
+    ungroup() %>%
+    select(PatientID, starts_with("Protein"))
+  
+  return(filtered_patients)
+}
+#example
+analyze_protein_expression()
+```
+
+# Question 3 {-}
+
+*Functioning code 5 marks*
+
+Solutions using either base R or `tidyverse` functions will be accepted for part a) of this question. Part b) should use `tidyverse` functions.
+
+This question uses sales data for a UK-based online gift store. Metadata on the file can be found at https://archive.ics.uci.edu/dataset/352/online+retail   
+
+A csv version of the data is in `Online Retail.csv`.
+
+a) Write a function that will process the retail data and sample a percentage of the records in the file. The target percentage should be supplied by the user as an argument `samp_perc`, with a default value of 10%. Each country should be represented in the sample in proportion to the number of records it contributes to the overall dataset. The function should be called with a _single_ line of code and return a data frame with four columns:   
+
+* the percentage of records sampled (`percent_sampled`)
+* the country name (`country_name`)
+* the number of records sampled (`n`)    
+* the mean price for each country (`mean_price`).    
+
+Display the first 10 rows returned by your function using the default setting.
+
+It is not necessary  to read in the sales data each time the function is called. 
+Hint: the `split()` or `slice_` family of functions may be useful.
+
+*16 marks*
+
+
+```{r question-3A}
+#answering Q3.A
+  
+  # Defining the function
+sample_retail_data <- function(samp_perc = 10) {
+  # Loading libraries
+  library(dplyr)
+  library(rprojroot)
+  
+  # Locating the project root and dataset file
+  retail_file <- read.csv(find_rstudio_root_file ("data", "Online Retail.csv"))
+  
+  # Reading the dataset
+  retail_data <- retail_file
+  
+  # Ensuring the required columns exist
+  if (!all(c("Country", "UnitPrice") %in% names(retail_data))) {
+    stop("The dataset must contain 'Country' and 'UnitPrice' columns.")
+  }
+  
+  
+  # Sampling records proportionally by country
+  sample_data <- retail_data %>%
+    group_by(Country) %>%
+    sample_frac(samp_perc / 100) %>%
+    summarise(
+      percent_sampled = samp_perc,
+      country_name = unique(Country),
+      n = n(),
+      mean_price = mean(UnitPrice, na.rm = TRUE)
+    )
+  
+  # Returning the sampled data summary
+  return(sample_data)
+}
+#example
+sample_retail_data()
+
+
+```
+
+b) For two countries of your choice, use the output from your function and `ggplot()` to visualise the relationship between the percentage of records sampled and the mean price. 
+Measurements must be shown at 1%, 25%, 50%, 75% and 100% sampling percentages.
+
+*8 marks*
+
+
+```{r question-3B}
+
+#answering Q3.B
+# Sampling percentages
+sampling_percentages <- c(1, 25, 50, 75, 100)
+
+# Collecting data for different sampling percentages
+results <- lapply(sampling_percentages, function(perc) {
+  sample_retail_data(samp_perc = perc)
+})
+
+# Combinining the results into a single data frame
+combined_results <- bind_rows(results)
+
+# Filtering the data for two countries of choice
+filtered_results <- combined_results %>%
+  filter(country_name %in% c("Canada", "Germany"))
+
+# Ploting the relationship between the percentage of records sampled and the mean price
+ggplot(filtered_results, aes(x = percent_sampled, y = mean_price, color = country_name)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Relationship between Percentage of Records Sampled and Mean Price",
+       x = "Percentage of Records Sampled",
+       y = "Mean Price",
+       color = "Country") +
+  theme_minimal()
+```
+
